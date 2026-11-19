@@ -63,7 +63,11 @@ No hay secretos; todas son variables:
 2. **Pipeline 2** (`02 - Construcción y publicación`): al hacer push de `aplicacion/**` a `main`. Publica `devops-final-frontend:<sha>` y `devops-final-backend:<sha>`.
 3. **Pipeline 3** (`03 - Despliegue`): se dispara solo al terminar el 2. También manual con un `image_tag` para desplegar o revertir.
 
+Si hiciste push del código antes de configurar las variables del paso 2, esas ejecuciones habrán fallado (sin rol que asumir). Una vez configuradas, lanza el pipeline 2 con **Run workflow** (`workflow_dispatch`) en `main`: al terminar con éxito dispara solo el pipeline 3.
+
 Al terminar, la URL está en el output `app_url` y en el log del smoke test.
+
+> Antes de subir cambios en `terraform/`, ejecuta `terraform fmt -recursive`: el pipeline 1 falla si el formato no es el canónico.
 
 ### Prueba local
 

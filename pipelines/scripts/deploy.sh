@@ -12,6 +12,7 @@ CLUSTER="${PROJECT}-cluster"
 DESIRED="${DESIRED_COUNT:-1}"
 ACCOUNT_ID="$(aws sts get-caller-identity --query Account --output text)"
 REGISTRY="${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
+DEPLOYED="" # líneas "componente=arn_task_definition" para verificar al final
 
 for component in backend frontend; do
   SERVICE="${PROJECT}-${component}"
@@ -35,6 +36,7 @@ for component in backend frontend; do
   NEW_TD_ARN="$(aws ecs register-task-definition --region "$REGION" --cli-input-json "$NEW_TD_JSON" \
     --query taskDefinition.taskDefinitionArn --output text)"
   echo "[$component] task definition: $NEW_TD_ARN"
+  DEPLOYED+="${component}=${NEW_TD_ARN}"$'\n'
 
   aws ecs update-service --region "$REGION" --cluster "$CLUSTER" --service "$SERVICE" \
     --task-definition "$NEW_TD_ARN" --desired-count "$DESIRED" >/dev/null
@@ -49,4 +51,18 @@ if ! aws ecs wait services-stable --region "$REGION" --cluster "$CLUSTER" \
     --query 'services[].{name:serviceName,events:events[:3].message}' --output json >&2
   exit 1
 fi
+
+# `services-stable` también termina bien cuando el circuit breaker revierte al despliegue anterior
+# (el servicio vuelve a ser estable con la revisión vieja). Se comprueba que cada servicio quedó
+# realmente en la task definition recién registrada.
+while IFS='=' read -r component expected_td; do
+  [ -n "$component" ] || continue
+  ACTIVE_TD="$(aws ecs describe-services --region "$REGION" --cluster "$CLUSTER" \
+    --services "${PROJECT}-${component}" --query 'services[0].taskDefinition' --output text)"
+  if [ "$ACTIVE_TD" != "$expected_td" ]; then
+    echo "ERROR: [$component] el despliegue fue revertido (activa: $ACTIVE_TD, esperada: $expected_td)." >&2
+    exit 1
+  fi
+done <<< "$DEPLOYED"
+
 echo "Despliegue completado con tag $TAG"

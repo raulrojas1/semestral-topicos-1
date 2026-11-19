@@ -82,7 +82,9 @@ resource "aws_ecs_service" "app" {
     container_port   = each.value.port
   }
 
-  depends_on = [aws_lb_listener.http]
+  # La regla /api/* es la que asocia el target group del backend al ALB; sin ella ECS rechaza
+  # crear el servicio ("target group does not have an associated load balancer").
+  depends_on = [aws_lb_listener.http, aws_lb_listener_rule.api]
 
   # El pipeline 3 gestiona la task definition y el desired_count.
   lifecycle {

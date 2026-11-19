@@ -20,8 +20,10 @@ retry() { # reintenta mientras el ALB registra los targets
   done
 }
 
-check_frontend() { curl -fsS "$URL/" | grep -q "Demo DevOps"; }
-check_backend()  { curl -fsS "$URL/api/health" | grep -q '"ok"'; }
+# Se guarda la respuesta en una variable: con `pipefail`, `curl | grep -q` puede fallar
+# de forma intermitente si grep cierra la tubería antes de que curl termine de escribir.
+check_frontend() { local body; body="$(curl -fsS --max-time 10 "$URL/")" && grep -q "Demo DevOps" <<< "$body"; }
+check_backend()  { local body; body="$(curl -fsS --max-time 10 "$URL/api/health")" && grep -q '"ok"' <<< "$body"; }
 
 retry check_frontend && echo "OK frontend" || { echo "FALLO frontend" >&2; exit 1; }
 retry check_backend  && echo "OK backend /api/health" || { echo "FALLO backend" >&2; exit 1; }
