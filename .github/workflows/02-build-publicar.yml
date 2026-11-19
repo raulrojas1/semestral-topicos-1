@@ -1,0 +1,55 @@
+name: 02 - Construcción y publicación en ECR
+
+on:
+  push:
+    branches: [main]
+    paths: ["aplicacion/**", "pipelines/scripts/build-and-push.sh"]
+  pull_request:
+    paths: ["aplicacion/**"]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: aplicacion/backend/package-lock.json
+
+      - name: Instalar dependencias y validar sintaxis del backend
+        working-directory: aplicacion/backend
+        run: |
+          npm ci
+          node --check server.js
+
+      - name: Tag de imagen (SHA corto del commit)
+        id: tag
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Validar build de imágenes (PR, sin publicar)
+        if: github.event_name == 'pull_request'
+        run: |
+          docker build -t backend-test aplicacion/backend
+          docker build -t frontend-test aplicacion/frontend
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        if: github.event_name != 'pull_request'
+        with:
+          role-to-assume: ${{ vars.AWS_APP_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Construir y publicar en ECR
+        if: github.event_name != 'pull_request'
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+        run: bash pipelines/scripts/build-and-push.sh "${{ steps.tag.outputs.tag }}"

@@ -1,0 +1,3 @@
+bucket = "devops-final-tfstate-123456789012"
+key    = "devops-final/terraform.tfstate"
+region = "us-east-1"

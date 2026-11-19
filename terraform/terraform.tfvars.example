@@ -1,0 +1,7 @@
+aws_region        = "us-east-1"
+project_name      = "devops-final"
+github_repository = "TU_USUARIO/TU_REPO"
+github_branch     = "main"
+
+# false si la cuenta ya tiene el proveedor OIDC de GitHub
+create_github_oidc_provider = true

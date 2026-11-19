@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <title>Demo DevOps AWS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    li { margin: .3rem 0; }
+    #status { padding: .5rem; border-radius: 4px; background: #eee; }
+    .ok { background: #d4f5dd !important; } .fail { background: #fbd5d5 !important; }
+  </style>
+</head>
+<body>
+  <h1>Demo DevOps en AWS (ECS Fargate)</h1>
+  <p id="status">Consultando backend...</p>
+  <h2>Elementos</h2>
+  <ul id="list"></ul>
+  <form id="form">
+    <input id="text" maxlength="200" placeholder="Nuevo elemento" required>
+    <button>Agregar</button>
+  </form>
+  <script>
+    // Ruta relativa: el ALB envía /api/* al backend
+    const status = document.getElementById("status");
+    const list = document.getElementById("list");
+
+    async function loadInfo() {
+      try {
+        const info = await (await fetch("/api/info")).json();
+        status.textContent = `Backend OK · versión ${info.version} · tarea ${info.hostname}`;
+        status.className = "ok";
+      } catch {
+        status.textContent = "Backend no disponible";
+        status.className = "fail";
+      }
+    }
+    async function loadItems() {
+      const items = await (await fetch("/api/items")).json();
+      list.replaceChildren(...items.map(i => Object.assign(document.createElement("li"), { textContent: i.text })));
+    }
+    document.getElementById("form").addEventListener("submit", async e => {
+      e.preventDefault();
+      const input = document.getElementById("text");
+      await fetch("/api/items", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text: input.value }) });
+      input.value = "";
+      loadItems();
+    });
+    loadInfo(); loadItems();
+  </script>
+</body>
+</html>

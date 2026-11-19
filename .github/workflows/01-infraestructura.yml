@@ -1,0 +1,76 @@
+name: 01 - Infraestructura (Terraform)
+
+on:
+  pull_request:
+    paths: ["terraform/**"]
+  push:
+    branches: [main]
+    paths: ["terraform/**"]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Acción"
+        type: choice
+        options: [apply, destroy]
+        default: apply
+
+permissions:
+  id-token: write   # OIDC hacia AWS
+  contents: read
+
+concurrency:
+  group: terraform
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  TF_VAR_aws_region: ${{ vars.AWS_REGION }}
+  TF_VAR_github_repository: ${{ github.repository }}
+  TF_VAR_create_github_oidc_provider: ${{ vars.CREATE_OIDC_PROVIDER || 'true' }}
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraform
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Format
+        run: terraform fmt -check -recursive
+
+      - name: Init
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="key=devops-final/terraform.tfstate" \
+            -backend-config="region=${{ vars.AWS_REGION }}"
+
+      - name: Validate
+        run: terraform validate
+
+      - name: Plan
+        if: github.event.inputs.action != 'destroy'
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Apply
+        if: github.event_name != 'pull_request' && github.event.inputs.action != 'destroy'
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Destroy
+        if: github.event.inputs.action == 'destroy'
+        run: terraform destroy -input=false -auto-approve
+
+      - name: Outputs
+        if: github.event_name != 'pull_request' && github.event.inputs.action != 'destroy'
+        run: terraform output
