@@ -15,6 +15,16 @@ locals {
   )
 }
 
+# GitHub emite el claim "sub" en dos formatos segun el repositorio:
+#   clasico:             repo:owner/repo:ref:refs/heads/main
+#   con IDs inmutables:  repo:owner@<id>/repo@<id>:ref:refs/heads/main
+# Se aceptan ambos. En el segundo solo se comodinan los IDs: el nombre del dueno y del repo
+# siguen fijos, asi que ningun otro usuario u organizacion puede asumir los roles.
+locals {
+  oidc_owner = split("/", var.github_repository)[0]
+  oidc_repo  = split("/", var.github_repository)[1]
+}
+
 # Solo workflows del repo indicado, en la rama indicada, pueden asumir los roles.
 data "aws_iam_policy_document" "github_assume" {
   statement {
@@ -37,6 +47,8 @@ data "aws_iam_policy_document" "github_assume" {
       values = [
         "repo:${var.github_repository}:ref:refs/heads/${var.github_branch}",
         "repo:${var.github_repository}:pull_request",
+        "repo:${local.oidc_owner}@*/${local.oidc_repo}@*:ref:refs/heads/${var.github_branch}",
+        "repo:${local.oidc_owner}@*/${local.oidc_repo}@*:pull_request",
       ]
     }
   }
