@@ -8,8 +8,8 @@ Aplicación web (frontend nginx + backend Node/Express) desplegada en ECS Fargat
 |---|---|
 | `terraform/` | Infraestructura: VPC, ALB, ECR, ECS Fargate, IAM, OIDC de GitHub |
 | `aplicacion/` | `frontend/` y `backend/` con sus Dockerfiles, y `docker-compose.yml` para pruebas locales |
-| `pipelines/scripts/` | Lógica de los pipelines (bootstrap, build, deploy, smoke test) |
-| `.github/workflows/` | Definiciones de los tres pipelines (GitHub exige esta ruta) |
+| `pipelines/` | Índice de los tres pipelines y sus scripts (`scripts/`: bootstrap, build, deploy, smoke test). Ver [`pipelines/README.md`](pipelines/README.md) |
+| `.github/workflows/` | Definiciones de los tres pipelines en YAML (GitHub exige esta ruta) |
 
 ## Arquitectura
 
@@ -87,4 +87,22 @@ Ejecuta el pipeline 1 manualmente con `action = destroy`, o `terraform destroy` 
 4. Errores: desplegar un tag inexistente (falla con mensaje claro) y explicar el circuit breaker.
 5. Credenciales: no hay claves, solo OIDC y variables.
 
-Evidencia de la demo: _(agregar enlace)_
+## Evidencia de la demo
+
+Ejecución real en AWS (us-east-1), commit `fc6d2a7`:
+
+| Qué | Evidencia |
+|---|---|
+| Pipeline 1: Terraform (fmt, validate, plan, apply) | [ejecución exitosa](https://github.com/raulrojas1/semestral-topicos-1/actions/runs/45313236013) |
+| Pipeline 2: build y push a ECR | [ejecución exitosa](https://github.com/raulrojas1/semestral-topicos-1/actions/runs/45313319130) |
+| Pipeline 3: despliegue en ECS y smoke test | [ejecución exitosa](https://github.com/raulrojas1/semestral-topicos-1/actions/runs/45313390082) |
+| Imágenes en ECR | `devops-final-frontend:fc6d2a7` y `devops-final-backend:fc6d2a7` |
+| Aplicación funcionando | Página con "Backend OK · versión fc6d2a7" servida por el ALB (la URL es el output `app_url`; se elimina al hacer `terraform destroy`) |
+
+Todas las ejecuciones están en la pestaña [Actions](https://github.com/raulrojas1/semestral-topicos-1/actions). Las ejecuciones en rojo del inicio corresponden a la puesta en marcha, antes de configurar las variables de GitHub y de corregir la política OIDC descrita abajo.
+
+## Problemas encontrados y cómo se resolvieron
+
+- **OIDC rechazado (`Not authorized to perform sts:AssumeRoleWithWebIdentity`).** GitHub emite el claim `sub` con IDs inmutables del dueño y del repositorio (`repo:owner@<id>/repo@<id>:ref:refs/heads/main`), no solo en el formato clásico. La política de confianza de los roles ahora acepta ambos formatos y deja fijos el nombre del dueño y del repo, para que ningún otro usuario pueda asumir el rol.
+- **Despliegue revertido sin que el pipeline fallara.** `aws ecs wait services-stable` termina bien cuando el circuit breaker revierte. `deploy.sh` comprueba que cada servicio quedó en la task definition recién registrada y falla si no.
+- **Orden de creación en Terraform.** Los servicios ECS dependen de la regla `/api/*` del ALB; sin ella ECS rechaza el target group del backend.
