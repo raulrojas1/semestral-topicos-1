@@ -1,18 +1,3 @@
-[ Tu PC / Git Push ]
-        │
-        ▼
-[ Repositorio en GitHub ]
-        │
-        ▼ (Dispara Workflows)
-[ GitHub Actions (Runners) ] ──( Autenticación OIDC vía IAM )──► [ AWS ]
-        │                                                           │
-        ├── Pipeline 1 (Terraform) ───────────────────────────────► ├─► S3 (Guarda el estado .tfstate)
-        │                                                           ├─► ALB, VPC, Clúster ECS
-        │                                                           │
-        ├── Pipeline 2 (CI: build-and-push.sh) ───────────────────► ├─► ECR (Guarda imágenes Docker)
-        │                                                           │
-        └── Pipeline 3 (CD: deploy.sh + smoke-test.sh) ───────────► └─► ECS Fargate (Ejecuta la app)
-                                                                        └─► Valida contra el ALB
 
 # Proyecto final: tres pipelines DevOps en AWS
 
