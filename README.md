@@ -1,4 +1,4 @@
-[ Tu Mac / Git Push ]
+[ Tu PC / Git Push ]
         │
         ▼
 [ Repositorio en GitHub ]
